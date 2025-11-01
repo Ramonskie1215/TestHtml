@@ -190,7 +190,7 @@
     <!-- Firebase + Map Logic -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
-        import { getDatabase, ref, get, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
+        import { getDatabase, ref, get, set, remove } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
         import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
 
         const firebaseConfig = {
@@ -208,8 +208,7 @@
         const auth = getAuth(app);
 
         signInAnonymously(auth).catch(err => {
-            console.error('Auth error:', err);
-            alert('Firebase auth failed.');
+            console.error('Firebase auth failed:', err);
         });
 
         // ---------- MAP ----------
@@ -293,6 +292,7 @@
                         div.innerHTML = `<b>No devices inside this circle.</b>`;
                     }
                 } catch (e) {
+                    console.error('Error loading devices for circle:', e);
                     div.innerHTML += `<div style="color:red;margin-top:8px;">Error loading devices.</div>`;
                 } finally {
                     btn.remove();
@@ -321,8 +321,12 @@
                     const { x, y, label } = res[0];
                     map.setView([y, x], 13);
                     searchMarker.setLatLng([y, x]).setPopupContent(label).openPopup();
-                } else alert('Location not found.');
-            } catch { alert('Search error.'); }
+                } else {
+                    console.warn('Search: Location not found');
+                }
+            } catch (e) {
+                console.error('Search error:', e);
+            }
         }
 
         // ---------- LOAD DEVICES ----------
@@ -333,7 +337,11 @@
             try {
                 const snap = await get(ref(db, 'devices'));
                 const data = snap.val();
-                if (!data) { alert('No devices.'); return; }
+                if (!data) {
+                    console.info('No devices found in Firebase.');
+                    btn.innerText = 'No devices';
+                    return;
+                }
                 Object.keys(data).forEach(id => {
                     const d = data[id];
                     const lat = parseFloat(d.latitude), lng = parseFloat(d.longitude);
@@ -345,8 +353,10 @@
                 });
                 if (deviceMarkers.getLayers().length) map.fitBounds(deviceMarkers.getBounds(), { padding: [20, 20] });
                 btn.innerText = `Loaded ${deviceMarkers.getLayers().length}`;
-            } catch { alert('Load error.'); }
-            finally {
+            } catch (e) {
+                console.error('Failed to load devices:', e);
+                btn.innerText = 'Load failed';
+            } finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Load Devices from Firebase', 3000);
                 toggleModal();
@@ -369,8 +379,10 @@
                     .openPopup();
                 map.setView([lat,lng],13);
                 btn.innerText = 'Added!';
-            } catch { alert('Add error.'); }
-            finally {
+            } catch (e) {
+                console.error('Failed to add sample device:', e);
+                btn.innerText = 'Add failed';
+            } finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Add Sample Device', 3000);
                 toggleModal();
@@ -385,9 +397,10 @@
             try {
                 await remove(ref(db, 'devices'));
                 deviceMarkers.clearLayers();
-                alert('All devices cleared.');
-            } catch (e) { alert('Clear failed.'); }
-            finally {
+                console.info('All devices cleared from Firebase and map.');
+            } catch (e) {
+                console.error('Failed to clear devices:', e);
+            } finally {
                 btn.disabled = false;
                 btn.innerText = 'Clear Devices';
                 toggleModal();
@@ -397,12 +410,19 @@
         // ---------- AUTO-SYNC TOGGLE ----------
         const autoSyncBtn = document.getElementById('autoSyncBtn');
         async function initAutoSync() {
-            const snap = await get(ref(db, 'settings/autoSync'));
-            const saved = snap.val();
-            const isOn = saved === true;
-            if (saved === null) await set(ref(db, 'settings/autoSync'), false);
-            updateAutoSyncBtn(isOn);
-            if (isOn) autoSyncStart();
+            try {
+                const snap = await get(ref(db, 'settings/autoSync'));
+                const saved = snap.val();
+                const isOn = saved === true;
+                if (saved === null) {
+                    await set(ref(db, 'settings/autoSync'), false);
+                    console.info('Auto-Sync setting initialized to OFF');
+                }
+                updateAutoSyncBtn(isOn);
+                if (isOn) autoSyncStart();
+            } catch (e) {
+                console.error('Failed to initialize Auto-Sync:', e);
+            }
         }
         function updateAutoSyncBtn(on) {
             autoSyncBtn.textContent = `Auto-Sync: ${on?'ON':'OFF'}`;
@@ -412,16 +432,22 @@
         async function toggleAutoSync() {
             const currentlyOn = autoSyncBtn.classList.contains('on');
             const newVal = !currentlyOn;
-            await set(ref(db, 'settings/autoSync'), newVal);
-            updateAutoSyncBtn(newVal);
-            if (newVal) autoSyncStart(); else autoSyncStop();
+            try {
+                await set(ref(db, 'settings/autoSync'), newVal);
+                updateAutoSyncBtn(newVal);
+                if (newVal) {
+                    console.info('Auto-Sync enabled');
+                    autoSyncStart();
+                } else {
+                    console.info('Auto-Sync disabled');
+                }
+            } catch (e) {
+                console.error('Failed to toggle Auto-Sync:', e);
+            }
         }
         function autoSyncStart() {
             loadDevices();
             loadCircles();
-        }
-        function autoSyncStop() {
-            // nothing to stop – we just don't load on refresh
         }
 
         // ---------- CIRCLE MODE ----------
@@ -463,7 +489,10 @@
 
         // ---------- FINISH POLYLINE ----------
         async function finishPolyline() {
-            if (polylinePoints.length < 3) { alert('Need 3+ points.'); return; }
+            if (polylinePoints.length < 3) {
+                console.warn('Polyline needs at least 3 points');
+                return;
+            }
             const id = 'polyline_' + Math.random().toString(36).substr(2, 6);
             const date = new Date().toISOString();
             try {
@@ -481,7 +510,9 @@
                 document.getElementById('coords').innerText = 'Click on map to see coordinates';
                 polylinePoints = [];
                 toggleDoneButton(false);
-            } catch { alert('Save error.'); }
+            } catch (e) {
+                console.error('Failed to save polyline:', e);
+            }
             toggleModal();
         }
 
@@ -493,7 +524,11 @@
             try {
                 const snap = await get(ref(db, 'circles'));
                 const data = snap.val();
-                if (!data) { alert('No circles.'); return; }
+                if (!data) {
+                    console.info('No circles found in Firebase.');
+                    btn.innerText = 'No circles';
+                    return;
+                }
                 Object.keys(data).forEach(id => {
                     const c = data[id];
                     const lat = parseFloat(c.latitude), lng = parseFloat(c.longitude), radius = parseFloat(c.radius);
@@ -506,8 +541,10 @@
                 });
                 if (circleLayer.getLayers().length) map.fitBounds(circleLayer.getBounds(), { padding:[20,20] });
                 btn.innerText = `Loaded ${circleLayer.getLayers().length}`;
-            } catch { alert('Load error.'); }
-            finally {
+            } catch (e) {
+                console.error('Failed to load circles:', e);
+                btn.innerText = 'Load failed';
+            } finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Load Circles from Firebase', 3000);
                 toggleModal();
@@ -545,7 +582,9 @@
                             .bindPopup(() => createCirclePopup(id, centerPoint.lat, centerPoint.lng, radius, date))
                             .openPopup();
                         map.setView(centerPoint,13);
-                    } catch { alert('Save error.'); }
+                    } catch (e) {
+                        console.error('Failed to save circle:', e);
+                    }
                     toggleCircleMode();
                 }
             } else if (polylineMode) {
