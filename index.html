@@ -119,6 +119,10 @@
         .modal-content .done-button:hover { background:#d32f2f; }
         #doneButton { display:none; }
 
+        /* ---------- Toggle style for Auto-Sync ---------- */
+        #autoSyncBtn.on  { background:#4CAF50 !important; }
+        #autoSyncBtn.off { background:#f44336 !important; }
+
         /* ---------- Mobile (≤500px) – 9:16 Portrait ---------- */
         @media (max-width: 500px) {
             #map { height: calc(100vh - 140px); }
@@ -164,6 +168,12 @@
             <button id="createCircle">Create Circle</button>
             <button id="createPolyline">Create Polyline</button>
             <button id="loadCircles">Load Circles from Firebase</button>
+
+            <hr style="margin:12px 0;">
+
+            <button id="clearDevices" style="background:#e91e63;">Clear Devices</button>
+            <button id="autoSyncBtn" class="off">Auto-Sync: OFF</button>
+
             <button id="doneButton" class="done-button">Done</button>
             <button class="close-button" id="closeModal">Close</button>
         </div>
@@ -180,7 +190,7 @@
     <!-- Firebase + Map Logic -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
-        import { getDatabase, ref, get, set } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
+        import { getDatabase, ref, get, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
         import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
 
         const firebaseConfig = {
@@ -194,7 +204,7 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+        const db = getDatabase(app);
         const auth = getAuth(app);
 
         signInAnonymously(auth).catch(err => {
@@ -202,7 +212,7 @@
             alert('Firebase auth failed.');
         });
 
-        // Initialize Map
+        // ---------- MAP ----------
         const map = L.map('map').setView([14.7724, 120.9600], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors',
@@ -225,7 +235,7 @@
         let searchMarker = L.marker([14.7724, 120.9600]).addTo(map).bindPopup('Initial location').openPopup();
         let clickMarker = null;
         const deviceMarkers = L.layerGroup().addTo(map);
-        const circleLayer = L.layerGroup().addTo(map);
+        const circleLayer   = L.layerGroup().addTo(map);
         const polylineLayer = L.layerGroup().addTo(map);
 
         let circleMode = false, polylineMode = false;
@@ -234,135 +244,116 @@
 
         const provider = new GeoSearch.OpenStreetMapProvider();
 
-        // Helper: Check if point is inside circle
-        function isPointInCircle(pointLat, pointLng, centerLat, centerLng, radius) {
-            const point = L.latLng(pointLat, pointLng);
-            const center = L.latLng(centerLat, centerLng);
-            return center.distanceTo(point) <= radius;
+        // ---------- HELPERS ----------
+        function isPointInCircle(pLat, pLng, cLat, cLng, radius) {
+            return L.latLng(cLat, cLng).distanceTo(L.latLng(pLat, pLng)) <= radius;
         }
 
-        // Create dynamic circle popup with "Show List" button
-        function createCirclePopup(id, centerLat, centerLng, radius, date) {
-            const popup = L.DomUtil.create('div');
-
+        function createCirclePopup(id, cLat, cLng, radius, date) {
+            const div = L.DomUtil.create('div');
             const info = document.createElement('div');
             info.innerHTML = `
                 <b>ID:</b> ${id}<br>
-                <b>Center:</b> ${centerLat.toFixed(5)}, ${centerLng.toFixed(5)}<br>
+                <b>Center:</b> ${cLat.toFixed(5)}, ${cLng.toFixed(5)}<br>
                 <b>Radius:</b> ${(radius/1000).toFixed(2)} km<br>
                 <b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                 <hr style="margin:8px 0;">
             `;
-            popup.appendChild(info);
+            div.appendChild(info);
 
-            const button = document.createElement('button');
-            button.textContent = 'Show List';
-            button.style.cssText = `
-                width:100%; padding:8px; margin-top:6px;
-                background:#2196F3; color:white; border:none;
-                border-radius:4px; cursor:pointer; font-size:13px;
-            `;
-            button.onclick = async () => {
-                button.disabled = true;
-                button.textContent = 'Loading...';
-
+            const btn = document.createElement('button');
+            btn.textContent = 'Show List';
+            btn.style.cssText = 'width:100%;padding:8px;margin-top:6px;background:#2196F3;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
+            btn.onclick = async () => {
+                btn.disabled = true; btn.textContent = 'Loading...';
                 try {
-                    const snap = await get(ref(database, 'devices'));
+                    const snap = await get(ref(db, 'devices'));
                     const devices = snap.val() || {};
                     const inside = [];
 
                     Object.keys(devices).forEach(devId => {
                         const d = devices[devId];
-                        const dlat = parseFloat(d.latitude);
-                        const dlng = parseFloat(d.longitude);
-                        if (!isNaN(dlat) && !isNaN(dlng)) {
-                            if (isPointInCircle(dlat, dlng, centerLat, centerLng, radius)) {
-                                const dateStr = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                                inside.push(`
-                                    <div style="margin:4px 0; padding:6px; background:#f9f9f9; border-radius:4px; font-size:12px;">
-                                        <b>${devId}</b><br>
-                                        <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
-                                        <b>Status:</b> ${d.status || 'N/A'}<br>
-                                        <b>Date:</b> ${dateStr}
-                                    </div>
-                                `);
-                            }
+                        const dlat = parseFloat(d.latitude), dlng = parseFloat(d.longitude);
+                        if (!isNaN(dlat) && !isNaN(dlng) && isPointInCircle(dlat, dlng, cLat, cLng, radius)) {
+                            const ds = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
+                            inside.push(`
+                                <div style="margin:4px 0;padding:6px;background:#f9f9f9;border-radius:4px;font-size:12px;">
+                                    <b>${devId}</b><br>
+                                    <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
+                                    <b>Status:</b> ${d.status||'N/A'}<br>
+                                    <b>Date:</b> ${ds}
+                                </div>
+                            `);
                         }
                     });
 
-                    if (inside.length > 0) {
-                        popup.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
+                    if (inside.length) {
+                        div.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
                     } else {
-                        popup.innerHTML = `<b>No devices inside this circle.</b>`;
+                        div.innerHTML = `<b>No devices inside this circle.</b>`;
                     }
-                } catch (err) {
-                    popup.innerHTML += `<div style="color:red; margin-top:8px;">Error loading devices.</div>`;
+                } catch (e) {
+                    div.innerHTML += `<div style="color:red;margin-top:8px;">Error loading devices.</div>`;
                 } finally {
-                    button.remove();
+                    btn.remove();
                 }
             };
-
-            popup.appendChild(button);
-            return popup;
+            div.appendChild(btn);
+            return div;
         }
 
-        // Modal
+        // ---------- MODAL ----------
         function toggleModal() {
-            const overlay = document.getElementById('modalOverlay');
-            overlay.style.display = overlay.style.display === 'block' ? 'none' : 'block';
+            const o = document.getElementById('modalOverlay');
+            o.style.display = o.style.display === 'block' ? 'none' : 'block';
         }
         function toggleDoneButton(show) {
             document.getElementById('doneButton').style.display = show ? 'block' : 'none';
         }
 
-        // Search
+        // ---------- SEARCH ----------
         async function searchLocation() {
-            const query = document.getElementById('search').value.trim();
-            if (!query) return;
+            const q = document.getElementById('search').value.trim();
+            if (!q) return;
             try {
-                const results = await provider.search({ query });
-                if (results.length > 0) {
-                    const { x, y, label } = results[0];
+                const res = await provider.search({ query: q });
+                if (res.length) {
+                    const { x, y, label } = res[0];
                     map.setView([y, x], 13);
                     searchMarker.setLatLng([y, x]).setPopupContent(label).openPopup();
-                } else {
-                    alert('Location not found.');
-                }
-            } catch (e) {
-                alert('Search error.');
-            }
+                } else alert('Location not found.');
+            } catch { alert('Search error.'); }
         }
 
-        // Load Devices
+        // ---------- LOAD DEVICES ----------
         async function loadDevices() {
             const btn = document.getElementById('loadDevices');
             btn.disabled = true; btn.innerText = 'Loading...';
             deviceMarkers.clearLayers();
             try {
-                const snap = await get(ref(database, 'devices'));
+                const snap = await get(ref(db, 'devices'));
                 const data = snap.val();
                 if (!data) { alert('No devices.'); return; }
                 Object.keys(data).forEach(id => {
                     const d = data[id];
-                    if (d.latitude && d.longitude) {
-                        const lat = parseFloat(d.latitude), lng = parseFloat(d.longitude);
-                        if (!isNaN(lat) && !isNaN(lng)) {
-                            const date = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                            L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
-                                .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${date}<br><b>Status:</b> ${d.status || 'N/A'}`);
-                        }
+                    const lat = parseFloat(d.latitude), lng = parseFloat(d.longitude);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const date = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
+                        L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
+                            .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${date}<br><b>Status:</b> ${d.status||'N/A'}`);
                     }
                 });
-                if (deviceMarkers.getLayers().length > 0) map.fitBounds(deviceMarkers.getBounds(), { padding: [20, 20] });
+                if (deviceMarkers.getLayers().length) map.fitBounds(deviceMarkers.getBounds(), { padding: [20, 20] });
                 btn.innerText = `Loaded ${deviceMarkers.getLayers().length}`;
-            } catch (e) { alert('Load error.'); } finally {
+            } catch { alert('Load error.'); }
+            finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Load Devices from Firebase', 3000);
                 toggleModal();
             }
         }
 
-        // Add Sample Device
+        // ---------- ADD SAMPLE ----------
         async function addSampleDevice() {
             const btn = document.getElementById('addSampleDevice');
             btn.disabled = true; btn.innerText = 'Adding...';
@@ -371,21 +362,69 @@
                 const lat = 14.7724 + (Math.random() * 0.02 - 0.01);
                 const lng = 120.9600 + (Math.random() * 0.02 - 0.01);
                 const date = new Date().toISOString();
-                const status = ['Active', 'Inactive', 'Offline'][Math.floor(Math.random() * 3)];
-                await set(ref(database, 'devices/' + id), { latitude: lat, longitude: lng, date, status });
-                const marker = L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
-                    .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}<br><b>Status:</b> ${status}`)
+                const status = ['Active','Inactive','Offline'][Math.floor(Math.random()*3)];
+                await set(ref(db, 'devices/' + id), { latitude: lat, longitude: lng, date, status });
+                const m = L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
+                    .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US',{timeZone:'Asia/Manila'})}<br><b>Status:</b> ${status}`)
                     .openPopup();
-                map.setView([lat, lng], 13);
+                map.setView([lat,lng],13);
                 btn.innerText = 'Added!';
-            } catch (e) { alert('Add error.'); } finally {
+            } catch { alert('Add error.'); }
+            finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Add Sample Device', 3000);
                 toggleModal();
             }
         }
 
-        // Circle Mode
+        // ---------- CLEAR DEVICES ----------
+        async function clearDevices() {
+            if (!confirm('Delete ALL devices from Firebase?')) return;
+            const btn = document.getElementById('clearDevices');
+            btn.disabled = true; btn.innerText = 'Clearing...';
+            try {
+                await remove(ref(db, 'devices'));
+                deviceMarkers.clearLayers();
+                alert('All devices cleared.');
+            } catch (e) { alert('Clear failed.'); }
+            finally {
+                btn.disabled = false;
+                btn.innerText = 'Clear Devices';
+                toggleModal();
+            }
+        }
+
+        // ---------- AUTO-SYNC TOGGLE ----------
+        const autoSyncBtn = document.getElementById('autoSyncBtn');
+        async function initAutoSync() {
+            const snap = await get(ref(db, 'settings/autoSync'));
+            const saved = snap.val();
+            const isOn = saved === true;
+            if (saved === null) await set(ref(db, 'settings/autoSync'), false);
+            updateAutoSyncBtn(isOn);
+            if (isOn) autoSyncStart();
+        }
+        function updateAutoSyncBtn(on) {
+            autoSyncBtn.textContent = `Auto-Sync: ${on?'ON':'OFF'}`;
+            autoSyncBtn.classList.toggle('on', on);
+            autoSyncBtn.classList.toggle('off', !on);
+        }
+        async function toggleAutoSync() {
+            const currentlyOn = autoSyncBtn.classList.contains('on');
+            const newVal = !currentlyOn;
+            await set(ref(db, 'settings/autoSync'), newVal);
+            updateAutoSyncBtn(newVal);
+            if (newVal) autoSyncStart(); else autoSyncStop();
+        }
+        function autoSyncStart() {
+            loadDevices();
+            loadCircles();
+        }
+        function autoSyncStop() {
+            // nothing to stop – we just don't load on refresh
+        }
+
+        // ---------- CIRCLE MODE ----------
         function toggleCircleMode() {
             circleMode = !circleMode;
             const btn = document.getElementById('createCircle');
@@ -402,7 +441,7 @@
             toggleModal();
         }
 
-        // Polyline Mode
+        // ---------- POLYLINE MODE ----------
         function togglePolylineMode() {
             polylineMode = !polylineMode;
             const btn = document.getElementById('createPolyline');
@@ -422,61 +461,60 @@
             toggleModal();
         }
 
-        // Finish Polyline
+        // ---------- FINISH POLYLINE ----------
         async function finishPolyline() {
             if (polylinePoints.length < 3) { alert('Need 3+ points.'); return; }
             const id = 'polyline_' + Math.random().toString(36).substr(2, 6);
             const date = new Date().toISOString();
             try {
-                await set(ref(database, 'polylines'), {});
-                await set(ref(database, 'polylines/' + id), { points: polylinePoints.map(p => ({ lat: p.lat, lng: p.lng })), date });
+                await set(ref(db, 'polylines'), {});
+                await set(ref(db, 'polylines/' + id), { points: polylinePoints.map(p=>({lat:p.lat,lng:p.lng})), date });
                 if (previewPolyline) map.removeLayer(previewPolyline);
                 polylineLayer.clearLayers();
-                const polygon = L.polygon(polylinePoints, { color: '#FF5722', fillOpacity: 0.05, weight: 2 }).addTo(polylineLayer)
-                    .bindPopup(`<b>ID:</b> ${id}<br><b>Points:</b> ${polylinePoints.length}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`)
+                const poly = L.polygon(polylinePoints, { color:'#FF5722', fillOpacity:0.05, weight:2 }).addTo(polylineLayer)
+                    .bindPopup(`<b>ID:</b> ${id}<br><b>Points:</b> ${polylinePoints.length}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US',{timeZone:'Asia/Manila'})}`)
                     .openPopup();
-                map.fitBounds(polygon.getBounds(), { padding: [20, 20] });
+                map.fitBounds(poly.getBounds(), { padding:[20,20] });
                 polylineMode = false;
                 document.getElementById('createPolyline').classList.remove('active');
                 document.getElementById('createPolyline').innerText = 'Create Polyline';
                 document.getElementById('coords').innerText = 'Click on map to see coordinates';
                 polylinePoints = [];
                 toggleDoneButton(false);
-            } catch (e) { alert('Save error.'); }
+            } catch { alert('Save error.'); }
             toggleModal();
         }
 
-        // Load Circles
+        // ---------- LOAD CIRCLES ----------
         async function loadCircles() {
             const btn = document.getElementById('loadCircles');
             btn.disabled = true; btn.innerText = 'Loading...';
             circleLayer.clearLayers();
             try {
-                const snap = await get(ref(database, 'circles'));
+                const snap = await get(ref(db, 'circles'));
                 const data = snap.val();
                 if (!data) { alert('No circles.'); return; }
                 Object.keys(data).forEach(id => {
                     const c = data[id];
-                    if (c.latitude && c.longitude && c.radius) {
-                        const lat = parseFloat(c.latitude), lng = parseFloat(c.longitude), radius = parseFloat(c.radius);
-                        if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
-                            const date = c.date ? c.date : new Date().toISOString();
-                            L.circle([lat, lng], { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 })
-                                .addTo(circleLayer)
-                                .bindPopup(() => createCirclePopup(id, lat, lng, radius, date));
-                        }
+                    const lat = parseFloat(c.latitude), lng = parseFloat(c.longitude), radius = parseFloat(c.radius);
+                    if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+                        const date = c.date || new Date().toISOString();
+                        L.circle([lat,lng], { radius, color:'#FF5722', fillOpacity:0.05, weight:2 })
+                            .addTo(circleLayer)
+                            .bindPopup(() => createCirclePopup(id, lat, lng, radius, date));
                     }
                 });
-                if (circleLayer.getLayers().length > 0) map.fitBounds(circleLayer.getBounds(), { padding: [20, 20] });
+                if (circleLayer.getLayers().length) map.fitBounds(circleLayer.getBounds(), { padding:[20,20] });
                 btn.innerText = `Loaded ${circleLayer.getLayers().length}`;
-            } catch (e) { alert('Load error.'); } finally {
+            } catch { alert('Load error.'); }
+            finally {
                 btn.disabled = false;
                 setTimeout(() => btn.innerText = 'Load Circles from Firebase', 3000);
                 toggleModal();
             }
         }
 
-        // Map Click
+        // ---------- MAP CLICK ----------
         map.on('click', async e => {
             const lat = e.latlng.lat.toFixed(5), lng = e.latlng.lng.toFixed(5);
             if (circleMode) {
@@ -485,11 +523,11 @@
                     circleLayer.clearLayers();
                     document.getElementById('coords').innerText = 'Move to set radius';
                     if (clickMarker) map.removeLayer(clickMarker);
-                    map.on('mousemove', moveE => {
+                    map.on('mousemove', m => {
                         if (!centerPoint) return;
-                        const r = centerPoint.distanceTo(moveE.latlng);
+                        const r = centerPoint.distanceTo(m.latlng);
                         if (previewCircle) map.removeLayer(previewCircle);
-                        previewCircle = L.circle(centerPoint, { radius: r, color: '#FF5722', fillOpacity: 0.05, weight: 2, dashArray: '5,10' }).addTo(map);
+                        previewCircle = L.circle(centerPoint, { radius:r, color:'#FF5722', fillOpacity:0.05, weight:2, dashArray:'5,10' }).addTo(map);
                         document.getElementById('coords').innerText = `Radius: ${(r/1000).toFixed(2)} km`;
                     });
                 } else {
@@ -499,33 +537,33 @@
                     if (previewCircle) map.removeLayer(previewCircle);
                     map.off('mousemove');
                     try {
-                        await set(ref(database, 'circles'), {});
-                        await set(ref(database, 'circles/' + id), { latitude: centerPoint.lat, longitude: centerPoint.lng, radius, date });
+                        await set(ref(db, 'circles'), {});
+                        await set(ref(db, 'circles/' + id), { latitude:centerPoint.lat, longitude:centerPoint.lng, radius, date });
                         circleLayer.clearLayers();
-                        L.circle(centerPoint, { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 })
+                        L.circle(centerPoint, { radius, color:'#FF5722', fillOpacity:0.05, weight:2 })
                             .addTo(circleLayer)
                             .bindPopup(() => createCirclePopup(id, centerPoint.lat, centerPoint.lng, radius, date))
                             .openPopup();
-                        map.setView(centerPoint, 13);
-                    } catch (e) { alert('Save error.'); }
+                        map.setView(centerPoint,13);
+                    } catch { alert('Save error.'); }
                     toggleCircleMode();
                 }
             } else if (polylineMode) {
                 polylinePoints.push(e.latlng);
                 document.getElementById('coords').innerText = `Point ${polylinePoints.length}: ${lat}, ${lng}`;
                 if (previewPolyline) map.removeLayer(previewPolyline);
-                previewPolyline = L.polyline(polylinePoints, { color: '#FF5722', weight: 2 }).addTo(map);
+                previewPolyline = L.polyline(polylinePoints, { color:'#FF5722', weight:2 }).addTo(map);
                 if (clickMarker) map.removeLayer(clickMarker);
             } else {
                 document.getElementById('coords').innerText = `Lat: ${lat}, Lng: ${lng}`;
                 if (clickMarker) map.removeLayer(clickMarker);
-                clickMarker = L.marker(e.latlng, { icon: clickIcon }).addTo(map)
+                clickMarker = L.marker(e.latlng, { icon:clickIcon }).addTo(map)
                     .bindPopup(`Clicked<br>Lat: ${lat}, Lng: ${lng}`).openPopup();
             }
         });
 
-        // Event Listeners
-        document.getElementById('search').addEventListener('keypress', e => e.key === 'Enter' && searchLocation());
+        // ---------- EVENT LISTENERS ----------
+        document.getElementById('search').addEventListener('keypress', e => e.key==='Enter' && searchLocation());
         document.getElementById('searchButton').addEventListener('click', searchLocation);
         document.getElementById('loadDevices').addEventListener('click', loadDevices);
         document.getElementById('addSampleDevice').addEventListener('click', addSampleDevice);
@@ -535,7 +573,14 @@
         document.getElementById('doneButton').addEventListener('click', finishPolyline);
         document.getElementById('gearIcon').addEventListener('click', toggleModal);
         document.getElementById('closeModal').addEventListener('click', toggleModal);
-        document.getElementById('modalOverlay').addEventListener('click', e => e.target === e.currentTarget && toggleModal());
+        document.getElementById('modalOverlay').addEventListener('click', e => e.target===e.currentTarget && toggleModal());
+
+        // NEW BUTTONS
+        document.getElementById('clearDevices').addEventListener('click', clearDevices);
+        document.getElementById('autoSyncBtn').addEventListener('click', toggleAutoSync);
+
+        // ---------- INITIALISE AUTO-SYNC ----------
+        initAutoSync();
     </script>
 </body>
 </html>
