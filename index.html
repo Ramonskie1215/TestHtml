@@ -248,6 +248,19 @@
             return L.latLng(cLat, cLng).distanceTo(L.latLng(pLat, pLng)) <= radius;
         }
 
+        // Leaflet.pointInPolygon equivalent
+        function isPointInPolygon(point, polygonPoints) {
+            const x = point.lat, y = point.lng;
+            let inside = false;
+            for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+                const xi = polygonPoints[i].lat, yi = polygonPoints[i].lng;
+                const xj = polygonPoints[j].lat, yj = polygonPoints[j].lng;
+                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
         function createCirclePopup(id, cLat, cLng, radius, date) {
             const div = L.DomUtil.create('div');
             const info = document.createElement('div');
@@ -300,6 +313,89 @@
             };
             div.appendChild(btn);
             return div;
+        }
+
+        function createPolylinePopup(id, points, date) {
+            const div = L.DomUtil.create('div');
+            const info = document.createElement('div');
+            info.innerHTML = `
+                <b>ID:</b> ${id}<br>
+                <b>Points:</b> ${points.length}<br>
+                <b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
+                <hr style="margin:8px 0;">
+            `;
+            div.appendChild(info);
+
+            const btn = document.createElement('button');
+            btn.textContent = 'Show List';
+            btn.style.cssText = 'width:100%;padding:8px;margin-top:6px;background:#2196F3;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
+            btn.onclick = async () => {
+                btn.disabled = true; btn.textContent = 'Loading...';
+                try {
+                    const snap = await get(ref(db, 'devices'));
+                    const devices = snap.val() || {};
+                    const inside = [];
+
+                    Object.keys(devices).forEach(devId => {
+                        const d = devices[devId];
+                        const dlat = parseFloat(d.latitude), dlng = parseFloat(d.longitude);
+                        if (!isNaN(dlat) && !isNaN(dlng)) {
+                            const point = { lat: dlat, lng: dlng };
+                            if (isPointInPolygon(point, points)) {
+                                const ds = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
+                                inside.push(`
+                                    <div style="margin:4px 0;padding:6px;background:#f9f9f9;border-radius:4px;font-size:12px;">
+                                        <b>${devId}</b><br>
+                                        <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
+                                        <b>Status:</b> ${d.status||'N/A'}<br>
+                                        <b>Date:</b> ${ds}
+                                    </div>
+                                `);
+                            }
+                        }
+                    });
+
+                    if (inside.length) {
+                        div.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
+                    } else {
+                        div.innerHTML = `<b>No devices inside this polygon.</b>`;
+                    }
+                } catch (e) {
+                    console.error('Error loading devices for polyline:', e);
+                    div.innerHTML += `<div style="color:red;margin-top:8px;">Error loading devices.</div>`;
+                } finally {
+                    btn.remove();
+                }
+            };
+            div.appendChild(btn);
+            return div;
+        }
+
+        // ---------- DELETE OPPOSITE SHAPES ----------
+        async function deleteAllPolylines() {
+            try {
+                await remove(ref(db, 'polylines'));
+                polylineLayer.clearLayers();
+                if (previewPolyline) map.removeLayer(previewPolyline);
+                previewPolyline = null;
+                polylinePoints = [];
+                console.info('All polylines deleted (map + Firebase)');
+            } catch (e) {
+                console.error('Failed to delete polylines:', e);
+            }
+        }
+
+        async function deleteAllCircles() {
+            try {
+                await remove(ref(db, 'circles'));
+                circleLayer.clearLayers();
+                if (previewCircle) map.removeLayer(previewCircle);
+                previewCircle = null;
+                centerPoint = null;
+                console.info('All circles deleted (map + Firebase)');
+            } catch (e) {
+                console.error('Failed to delete circles:', e);
+            }
         }
 
         // ---------- MODAL ----------
@@ -451,40 +547,64 @@
         }
 
         // ---------- CIRCLE MODE ----------
-        function toggleCircleMode() {
-            circleMode = !circleMode;
-            const btn = document.getElementById('createCircle');
+        async function toggleCircleMode() {
             if (circleMode) {
-                btn.classList.add('active'); btn.innerText = 'Click center';
-                document.getElementById('coords').innerText = 'Click to set circle center';
-            } else {
-                btn.classList.remove('active'); btn.innerText = 'Create Circle';
-                document.getElementById('coords').innerText = 'Click on map to see coordinates';
-                centerPoint = null;
-                if (previewCircle) map.removeLayer(previewCircle); previewCircle = null;
-                map.off('mousemove');
+                toggleCircleModeOff();
+                return;
             }
+
+            // Entering circle mode → delete all polylines
+            if (polylineLayer.getLayers().length > 0 || polylinePoints.length > 0) {
+                await deleteAllPolylines();
+            }
+
+            circleMode = true;
+            const btn = document.getElementById('createCircle');
+            btn.classList.add('active'); btn.innerText = 'Click center';
+            document.getElementById('coords').innerText = 'Click to set circle center';
             toggleModal();
         }
 
+        function toggleCircleModeOff() {
+            circleMode = false;
+            const btn = document.getElementById('createCircle');
+            btn.classList.remove('active'); btn.innerText = 'Create Circle';
+            document.getElementById('coords').innerText = 'Click on map to see coordinates';
+            centerPoint = null;
+            if (previewCircle) map.removeLayer(previewCircle); previewCircle = null;
+            map.off('mousemove');
+        }
+
         // ---------- POLYLINE MODE ----------
-        function togglePolylineMode() {
-            polylineMode = !polylineMode;
-            const btn = document.getElementById('createPolyline');
+        async function togglePolylineMode() {
             if (polylineMode) {
-                btn.classList.add('active'); btn.innerText = 'Creating...';
-                document.getElementById('coords').innerText = 'Click to add point';
-                polylinePoints = [];
-                toggleDoneButton(true);
-                if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
-            } else {
-                btn.classList.remove('active'); btn.innerText = 'Create Polyline';
-                document.getElementById('coords').innerText = 'Click on map to see coordinates';
-                polylinePoints = [];
-                toggleDoneButton(false);
-                if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
+                togglePolylineModeOff();
+                return;
             }
+
+            // Entering polyline mode → delete all circles
+            if (circleLayer.getLayers().length > 0 || centerPoint) {
+                await deleteAllCircles();
+            }
+
+            polylineMode = true;
+            const btn = document.getElementById('createPolyline');
+            btn.classList.add('active'); btn.innerText = 'Creating...';
+            document.getElementById('coords').innerText = 'Click to add point';
+            polylinePoints = [];
+            toggleDoneButton(true);
+            if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
             toggleModal();
+        }
+
+        function togglePolylineModeOff() {
+            polylineMode = false;
+            const btn = document.getElementById('createPolyline');
+            btn.classList.remove('active'); btn.innerText = 'Create Polyline';
+            document.getElementById('coords').innerText = 'Click on map to see coordinates';
+            polylinePoints = [];
+            toggleDoneButton(false);
+            if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
         }
 
         // ---------- FINISH POLYLINE ----------
@@ -501,15 +621,10 @@
                 if (previewPolyline) map.removeLayer(previewPolyline);
                 polylineLayer.clearLayers();
                 const poly = L.polygon(polylinePoints, { color:'#FF5722', fillOpacity:0.05, weight:2 }).addTo(polylineLayer)
-                    .bindPopup(`<b>ID:</b> ${id}<br><b>Points:</b> ${polylinePoints.length}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US',{timeZone:'Asia/Manila'})}`)
+                    .bindPopup(() => createPolylinePopup(id, polylinePoints, date))
                     .openPopup();
                 map.fitBounds(poly.getBounds(), { padding:[20,20] });
-                polylineMode = false;
-                document.getElementById('createPolyline').classList.remove('active');
-                document.getElementById('createPolyline').innerText = 'Create Polyline';
-                document.getElementById('coords').innerText = 'Click on map to see coordinates';
-                polylinePoints = [];
-                toggleDoneButton(false);
+                togglePolylineModeOff();
             } catch (e) {
                 console.error('Failed to save polyline:', e);
             }
@@ -585,7 +700,7 @@
                     } catch (e) {
                         console.error('Failed to save circle:', e);
                     }
-                    toggleCircleMode();
+                    toggleCircleModeOff();
                 }
             } else if (polylineMode) {
                 polylinePoints.push(e.latlng);
@@ -608,7 +723,7 @@
         document.getElementById('addSampleDevice').addEventListener('click', addSampleDevice);
         document.getElementById('createCircle').addEventListener('click', toggleCircleMode);
         document.getElementById('createPolyline').addEventListener('click', togglePolylineMode);
-        document.getElementById('loadCircles').addEventListener('click', loadCircles);
+        document.getElement, 'loadCircles').addEventListener('click', loadCircles);
         document.getElementById('doneButton').addEventListener('click', finishPolyline);
         document.getElementById('gearIcon').addEventListener('click', toggleModal);
         document.getElementById('closeModal').addEventListener('click', toggleModal);
