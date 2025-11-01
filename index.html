@@ -234,6 +234,78 @@
 
         const provider = new GeoSearch.OpenStreetMapProvider();
 
+        // Helper: Check if point is inside circle
+        function isPointInCircle(pointLat, pointLng, centerLat, centerLng, radius) {
+            const point = L.latLng(pointLat, pointLng);
+            const center = L.latLng(centerLat, centerLng);
+            return center.distanceTo(point) <= radius;
+        }
+
+        // Create dynamic circle popup with "Show List" button
+        function createCirclePopup(id, centerLat, centerLng, radius, date) {
+            const popup = L.DomUtil.create('div');
+
+            const info = document.createElement('div');
+            info.innerHTML = `
+                <b>ID:</b> ${id}<br>
+                <b>Center:</b> ${centerLat.toFixed(5)}, ${centerLng.toFixed(5)}<br>
+                <b>Radius:</b> ${(radius/1000).toFixed(2)} km<br>
+                <b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
+                <hr style="margin:8px 0;">
+            `;
+            popup.appendChild(info);
+
+            const button = document.createElement('button');
+            button.textContent = 'Show List';
+            button.style.cssText = `
+                width:100%; padding:8px; margin-top:6px;
+                background:#2196F3; color:white; border:none;
+                border-radius:4px; cursor:pointer; font-size:13px;
+            `;
+            button.onclick = async () => {
+                button.disabled = true;
+                button.textContent = 'Loading...';
+
+                try {
+                    const snap = await get(ref(database, 'devices'));
+                    const devices = snap.val() || {};
+                    const inside = [];
+
+                    Object.keys(devices).forEach(devId => {
+                        const d = devices[devId];
+                        const dlat = parseFloat(d.latitude);
+                        const dlng = parseFloat(d.longitude);
+                        if (!isNaN(dlat) && !isNaN(dlng)) {
+                            if (isPointInCircle(dlat, dlng, centerLat, centerLng, radius)) {
+                                const dateStr = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
+                                inside.push(`
+                                    <div style="margin:4px 0; padding:6px; background:#f9f9f9; border-radius:4px; font-size:12px;">
+                                        <b>${devId}</b><br>
+                                        <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
+                                        <b>Status:</b> ${d.status || 'N/A'}<br>
+                                        <b>Date:</b> ${dateStr}
+                                    </div>
+                                `);
+                            }
+                        }
+                    });
+
+                    if (inside.length > 0) {
+                        popup.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
+                    } else {
+                        popup.innerHTML = `<b>No devices inside this circle.</b>`;
+                    }
+                } catch (err) {
+                    popup.innerHTML += `<div style="color:red; margin-top:8px;">Error loading devices.</div>`;
+                } finally {
+                    button.remove();
+                }
+            };
+
+            popup.appendChild(button);
+            return popup;
+        }
+
         // Modal
         function toggleModal() {
             const overlay = document.getElementById('modalOverlay');
@@ -388,9 +460,10 @@
                     if (c.latitude && c.longitude && c.radius) {
                         const lat = parseFloat(c.latitude), lng = parseFloat(c.longitude), radius = parseFloat(c.radius);
                         if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
-                            const date = c.date ? new Date(c.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                            L.circle([lat, lng], { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 }).addTo(circleLayer)
-                                .bindPopup(`<b>ID:</b> ${id}<br><b>Center:</b> ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><b>Radius:</b> ${(radius/1000).toFixed(2)} km<br><b>Date:</b> ${date}`);
+                            const date = c.date ? c.date : new Date().toISOString();
+                            L.circle([lat, lng], { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 })
+                                .addTo(circleLayer)
+                                .bindPopup(() => createCirclePopup(id, lat, lng, radius, date));
                         }
                     }
                 });
@@ -429,8 +502,9 @@
                         await set(ref(database, 'circles'), {});
                         await set(ref(database, 'circles/' + id), { latitude: centerPoint.lat, longitude: centerPoint.lng, radius, date });
                         circleLayer.clearLayers();
-                        L.circle(centerPoint, { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 }).addTo(circleLayer)
-                            .bindPopup(`<b>ID:</b> ${id}<br><b>Center:</b> ${centerPoint.lat.toFixed(5)}, ${centerPoint.lng.toFixed(5)}<br><b>Radius:</b> ${(radius/1000).toFixed(2)} km<br><b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`)
+                        L.circle(centerPoint, { radius, color: '#FF5722', fillOpacity: 0.05, weight: 2 })
+                            .addTo(circleLayer)
+                            .bindPopup(() => createCirclePopup(id, centerPoint.lat, centerPoint.lng, radius, date))
                             .openPopup();
                         map.setView(centerPoint, 13);
                     } catch (e) { alert('Save error.'); }
