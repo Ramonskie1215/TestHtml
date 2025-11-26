@@ -3,737 +3,355 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet Map – 9:16 Mobile Ready</title>
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
-
+    <title>Interactive Analog Clock</title>
     <style>
-        html, body { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; overflow: hidden; }
-        #map { height: calc(100vh - 120px); width: 100%; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        /* ---------- Search Bar ---------- */
-        .search-container {
-            position: absolute;
-            top: 8px; left: 8px; right: 8px;
-            z-index: 1000;
-            background: white;
-            padding: 6px;
-            border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
             display: flex;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .search-container input {
-            flex: 1;
-            min-width: 150px;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .search-container button {
-            padding: 8px 12px;
-            background:#4CAF50;
-            color:white;
-            border:none;
-            border-radius:4px;
-            cursor:pointer;
-            font-size: 14px;
-        }
-        .search-container button:hover { background:#45a049; }
-
-        /* ---------- Gear Icon ---------- */
-        .gear-icon {
-            position: absolute;
-            top: 8px; right: 8px;
-            z-index: 1000;
-            background:white;
-            padding:8px;
-            border-radius:6px;
-            box-shadow:0 2px 6px rgba(0,0,0,0.2);
-            cursor:pointer;
-            font-size:20px;
-            color:#333;
-        }
-        .gear-icon:hover { background:#f0f0f0; }
-
-        /* ---------- Coordinates Label ---------- */
-        .coords-label {
-            position: absolute;
-            top: 56px; left: 8px; right: 8px;
-            z-index: 1000;
-            background:white;
-            padding:6px 10px;
-            border-radius:6px;
-            box-shadow:0 2px 6px rgba(0,0,0,0.2);
-            font-size:13px;
-            white-space: nowrap;
+            min-height: 100vh;
+            color: white;
             overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        /* ---------- Modal ---------- */
-        .modal-overlay {
-            display:none;
-            position:fixed;
-            inset:0;
-            background:rgba(0,0,0,0.5);
-            z-index:2000;
-            align-items:center;
-            justify-content:center;
-            padding: 10px;
+        .container {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            margin: 20px;
+            max-width: 90%;
         }
-        .modal-content {
-            background:white;
-            padding:20px;
-            border-radius:8px;
-            width:90vw;
-            max-width:300px;
-            text-align:center;
-            box-shadow:0 4px 12px rgba(0,0,0,0.3);
-        }
-        .modal-content button {
-            display:block;
-            width:100%;
-            margin:8px 0;
-            padding:10px;
-            background:#2196F3;
-            color:white;
-            border:none;
-            border-radius:4px;
-            cursor:pointer;
-            font-size:14px;
-        }
-        .modal-content button:hover { background:#1976D2; }
-        .modal-content button:disabled { background:#ccc; cursor:not-allowed; }
-        .modal-content button.active { background:#FF5722; }
-        .modal-content button.active:hover { background:#E64A19; }
-        .modal-content .close-button,
-        .modal-content .done-button { background:#f44336; }
-        .modal-content .close-button:hover,
-        .modal-content .done-button:hover { background:#d32f2f; }
-        #doneButton { display:none; }
 
-        /* ---------- Toggle style for Auto-Sync ---------- */
-        #autoSyncBtn.on  { background:#4CAF50 !important; }
-        #autoSyncBtn.off { background:#f44336 !important; }
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
 
-        /* ---------- Mobile (≤500px) – 9:16 Portrait ---------- */
+        .subtitle {
+            margin-bottom: 30px;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .clock-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 30px;
+        }
+
+        .clock {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 10px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            box-shadow: 
+                inset 0 0 20px rgba(0, 0, 0, 0.2),
+                0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .clock-center {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom;
+            border-radius: 10px 10px 0 0;
+            transform: translateX(-50%);
+        }
+
+        .hour-hand {
+            width: 8px;
+            height: 30%;
+            background: #fff;
+            z-index: 3;
+        }
+
+        .minute-hand {
+            width: 6px;
+            height: 40%;
+            background: #fff;
+            z-index: 2;
+        }
+
+        .second-hand {
+            width: 2px;
+            height: 45%;
+            background: #ff5252;
+            z-index: 1;
+        }
+
+        .number {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        }
+
+        .number-1 { transform: rotate(30deg); }
+        .number-2 { transform: rotate(60deg); }
+        .number-3 { transform: rotate(90deg); }
+        .number-4 { transform: rotate(120deg); }
+        .number-5 { transform: rotate(150deg); }
+        .number-6 { transform: rotate(180deg); }
+        .number-7 { transform: rotate(210deg); }
+        .number-8 { transform: rotate(240deg); }
+        .number-9 { transform: rotate(270deg); }
+        .number-10 { transform: rotate(300deg); }
+        .number-11 { transform: rotate(330deg); }
+        .number-12 { transform: rotate(0deg); }
+
+        .digital-clock {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .date-display {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .theme-selector {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .theme-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+        }
+
+        .theme-classic { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); }
+        .theme-dark { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); }
+        .theme-light { background: linear-gradient(135deg, #8e9eab, #eef2f3); }
+        .theme-ocean { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
+        .theme-sunset { background: linear-gradient(135deg, #ff5e62, #ff9966); }
+
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
         @media (max-width: 500px) {
-            #map { height: calc(100vh - 140px); }
-
-            .search-container {
-                flex-direction: column;
-                top: 8px; left: 8px; right: 8px;
+            .clock-container {
+                width: 250px;
+                height: 250px;
             }
-            .search-container input,
-            .search-container button { width: 100%; }
-
-            .gear-icon {
-                top: auto;
-                bottom: 70px;
-                right: 8px;
+            
+            h1 {
+                font-size: 2rem;
             }
-
-            .coords-label {
-                top: auto;
-                bottom: 8px;
-                left: 8px;
-                right: 8px;
-                font-size: 12px;
+            
+            .digital-clock {
+                font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
-
-    <!-- UI Elements -->
-    <div class="search-container">
-        <input type="text" id="search" placeholder="Search for a location...">
-        <button id="searchButton">Confirm</button>
-    </div>
-    <div class="gear-icon" id="gearIcon"><i class="fas fa-gear"></i></div>
-    <div class="coords-label" id="coords">Click on map to see coordinates</div>
-
-    <!-- Modal -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-content">
-            <button id="loadDevices">Load Devices from Firebase</button>
-            <button id="addSampleDevice">Add Sample Device</button>
-            <button id="createCircle">Create Circle</button>
-            <button id="createPolyline">Create Polyline</button>
-            <button id="loadCircles">Load Circles from Firebase</button>
-
-            <hr style="margin:12px 0;">
-
-            <button id="clearDevices" style="background:#e91e63;">Clear Devices</button>
-            <button id="autoSyncBtn" class="off">Auto-Sync: OFF</button>
-
-            <button id="doneButton" class="done-button">Done</button>
-            <button class="close-button" id="closeModal">Close</button>
+    <div class="container">
+        <h1>Interactive Analog Clock</h1>
+        <p class="subtitle">A beautiful, functional clock for your browser</p>
+        
+        <div class="clock-container">
+            <div class="clock">
+                <!-- Clock numbers -->
+                <div class="number number-1">1</div>
+                <div class="number number-2">2</div>
+                <div class="number number-3">3</div>
+                <div class="number number-4">4</div>
+                <div class="number number-5">5</div>
+                <div class="number number-6">6</div>
+                <div class="number number-7">7</div>
+                <div class="number number-8">8</div>
+                <div class="number number-9">9</div>
+                <div class="number number-10">10</div>
+                <div class="number number-11">11</div>
+                <div class="number number-12">12</div>
+                
+                <!-- Clock hands -->
+                <div class="hand hour-hand" id="hour-hand"></div>
+                <div class="hand minute-hand" id="minute-hand"></div>
+                <div class="hand second-hand" id="second-hand"></div>
+                
+                <!-- Clock center -->
+                <div class="clock-center"></div>
+            </div>
+        </div>
+        
+        <div class="digital-clock" id="digital-clock">00:00:00</div>
+        <div class="date-display" id="date-display">Monday, January 1, 2023</div>
+        
+        <div class="controls">
+            <button id="toggle-seconds">Toggle Seconds</button>
+            <button id="toggle-digital">Toggle Digital</button>
+            <button id="toggle-date">Toggle Date</button>
+        </div>
+        
+        <div class="theme-selector">
+            <div class="theme-btn theme-classic" data-theme="classic"></div>
+            <div class="theme-btn theme-dark" data-theme="dark"></div>
+            <div class="theme-btn theme-light" data-theme="light"></div>
+            <div class="theme-btn theme-ocean" data-theme="ocean"></div>
+            <div class="theme-btn theme-sunset" data-theme="sunset"></div>
         </div>
     </div>
+    
+    <footer>
+        <p>Interactive Clock &copy; 2023 | Made with HTML, CSS & JavaScript</p>
+    </footer>
 
-    <!-- Map Container -->
-    <div id="map"></div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet-Geosearch -->
-    <script src="https://unpkg.com/leaflet-geosearch@3.10.1/dist/geosearch.umd.js"></script>
-
-    <!-- Firebase + Map Logic -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
-        import { getDatabase, ref, get, set, remove } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
-        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBGONaynbM6GSdq4Ee46dD8tqfeCYx-w-M",
-            authDomain: "probationlocator.firebaseapp.com",
-            databaseURL: "https://probationlocator-default-rtdb.firebaseio.com",
-            projectId: "probationlocator",
-            storageBucket: "probationlocator.firebasestorage.app",
-            messagingSenderId: "323066331183",
-            appId: "1:323066331183:web:61f35b70cb07c0618106da"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        signInAnonymously(auth).catch(err => {
-            console.error('Firebase auth failed:', err);
+    <script>
+        // Get DOM elements
+        const hourHand = document.getElementById('hour-hand');
+        const minuteHand = document.getElementById('minute-hand');
+        const secondHand = document.getElementById('second-hand');
+        const digitalClock = document.getElementById('digital-clock');
+        const dateDisplay = document.getElementById('date-display');
+        const toggleSecondsBtn = document.getElementById('toggle-seconds');
+        const toggleDigitalBtn = document.getElementById('toggle-digital');
+        const toggleDateBtn = document.getElementById('toggle-date');
+        const themeButtons = document.querySelectorAll('.theme-btn');
+        
+        // State variables
+        let showSeconds = true;
+        let showDigital = true;
+        let showDate = true;
+        
+        // Update clock function
+        function updateClock() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            const milliseconds = now.getMilliseconds();
+            
+            // Calculate angles for clock hands
+            const secondAngle = (seconds + milliseconds / 1000) * 6; // 360/60 = 6 degrees per second
+            const minuteAngle = (minutes + seconds / 60) * 6; // 360/60 = 6 degrees per minute
+            const hourAngle = (hours % 12 + minutes / 60) * 30; // 360/12 = 30 degrees per hour
+            
+            // Apply rotations to clock hands
+            secondHand.style.transform = `translateX(-50%) rotate(${secondAngle}deg)`;
+            minuteHand.style.transform = `translateX(-50%) rotate(${minuteAngle}deg)`;
+            hourHand.style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+            
+            // Update digital clock
+            if (showDigital) {
+                const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}${showSeconds ? `:${seconds.toString().padStart(2, '0')}` : ''}`;
+                digitalClock.textContent = timeString;
+            }
+            
+            // Update date display
+            if (showDate) {
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                dateDisplay.textContent = now.toLocaleDateString('en-US', options);
+            }
+        }
+        
+        // Toggle seconds display
+        toggleSecondsBtn.addEventListener('click', () => {
+            showSeconds = !showSeconds;
+            secondHand.style.display = showSeconds ? 'block' : 'none';
+            updateClock();
         });
-
-        // ---------- MAP ----------
-        const map = L.map('map').setView([14.7724, 120.9600], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-            maxZoom: 19
-        }).addTo(map);
-
-        // Icons
-        const clickIcon = L.divIcon({
-            className: 'custom-icon',
-            html: '<div style="background:blue;width:12px;height:12px;border-radius:50%;border:2px solid white;"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6]
+        
+        // Toggle digital clock
+        toggleDigitalBtn.addEventListener('click', () => {
+            showDigital = !showDigital;
+            digitalClock.style.display = showDigital ? 'inline-block' : 'none';
         });
-        const deviceIcon = L.divIcon({
-            className: 'custom-device-icon',
-            html: '<div style="background:orange;width:16px;height:16px;border:2px solid white;border-radius:2px;"></div>',
-            iconSize: [16, 16], iconAnchor: [8, 8]
+        
+        // Toggle date display
+        toggleDateBtn.addEventListener('click', () => {
+            showDate = !showDate;
+            dateDisplay.style.display = showDate ? 'block' : 'none';
         });
-
-        // Layers
-        let searchMarker = L.marker([14.7724, 120.9600]).addTo(map).bindPopup('Initial location').openPopup();
-        let clickMarker = null;
-        const deviceMarkers = L.layerGroup().addTo(map);
-        const circleLayer   = L.layerGroup().addTo(map);
-        const polylineLayer = L.layerGroup().addTo(map);
-
-        let circleMode = false, polylineMode = false;
-        let centerPoint = null, previewCircle = null;
-        let polylinePoints = [], previewPolyline = null;
-
-        const provider = new GeoSearch.OpenStreetMapProvider();
-
-        // ---------- HELPERS ----------
-        function isPointInCircle(pLat, pLng, cLat, cLng, radius) {
-            return L.latLng(cLat, cLng).distanceTo(L.latLng(pLat, pLng)) <= radius;
-        }
-
-        function isPointInPolygon(point, polygonPoints) {
-            const x = point.lat, y = point.lng;
-            let inside = false;
-            for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
-                const xi = polygonPoints[i].lat, yi = polygonPoints[i].lng;
-                const xj = polygonPoints[j].lat, yj = polygonPoints[j].lng;
-                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
-        }
-
-        function createCirclePopup(id, cLat, cLng, radius, date) {
-            const div = L.DomUtil.create('div');
-            const info = document.createElement('div');
-            info.innerHTML = `
-                <b>ID:</b> ${id}<br>
-                <b>Center:</b> ${cLat.toFixed(5)}, ${cLng.toFixed(5)}<br>
-                <b>Radius:</b> ${(radius/1000).toFixed(2)} km<br>
-                <b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
-                <hr style="margin:8px 0;">
-            `;
-            div.appendChild(info);
-
-            const btn = document.createElement('button');
-            btn.textContent = 'Show List';
-            btn.style.cssText = 'width:100%;padding:8px;margin-top:6px;background:#2196F3;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
-            btn.onclick = async () => {
-                btn.disabled = true; btn.textContent = 'Loading...';
-                try {
-                    const snap = await get(ref(db, 'devices'));
-                    const devices = snap.val() || {};
-                    const inside = [];
-
-                    Object.keys(devices).forEach(devId => {
-                        const d = devices[devId];
-                        const dlat = parseFloat(d.latitude), dlng = parseFloat(d.longitude);
-                        if (!isNaN(dlat) && !isNaN(dlng) && isPointInCircle(dlat, dlng, cLat, cLng, radius)) {
-                            const ds = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                            inside.push(`
-                                <div style="margin:4px 0;padding:6px;background:#f9f9f9;border-radius:4px;font-size:12px;">
-                                    <b>${devId}</b><br>
-                                    <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
-                                    <b>Status:</b> ${d.status||'N/A'}<br>
-                                    <b>Date:</b> ${ds}
-                                </div>
-                            `);
-                        }
-                    });
-
-                    if (inside.length) {
-                        div.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
-                    } else {
-                        div.innerHTML = `<b>No devices inside this circle.</b>`;
-                    }
-                } catch (e) {
-                    console.error('Error loading devices for circle:', e);
-                    div.innerHTML += `<div style="color:red;margin-top:8px;">Error loading devices.</div>`;
-                } finally {
-                    btn.remove();
-                }
-            };
-            div.appendChild(btn);
-            return div;
-        }
-
-        function createPolylinePopup(id, points, date) {
-            const div = L.DomUtil.create('div');
-            const info = document.createElement('div');
-            info.innerHTML = `
-                <b>ID:</b> ${id}<br>
-                <b>Points:</b> ${points.length}<br>
-                <b>Date:</b> ${new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
-                <hr style="margin:8px 0;">
-            `;
-            div.appendChild(info);
-
-            const btn = document.createElement('button');
-            btn.textContent = 'Show List';
-            btn.style.cssText = 'width:100%;padding:8px;margin-top:6px;background:#2196F3;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
-            btn.onclick = async () => {
-                btn.disabled = true; btn.textContent = 'Loading...';
-                try {
-                    const snap = await get(ref(db, 'devices'));
-                    const devices = snap.val() || {};
-                    const inside = [];
-
-                    Object.keys(devices).forEach(devId => {
-                        const d = devices[devId];
-                        const dlat = parseFloat(d.latitude), dlng = parseFloat(d.longitude);
-                        if (!isNaN(dlat) && !isNaN(dlng)) {
-                            const point = { lat: dlat, lng: dlng };
-                            if (isPointInPolygon(point, points)) {
-                                const ds = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                                inside.push(`
-                                    <div style="margin:4px 0;padding:6px;background:#f9f9f9;border-radius:4px;font-size:12px;">
-                                        <b>${devId}</b><br>
-                                        <b>Pos:</b> ${dlat.toFixed(5)}, ${dlng.toFixed(5)}<br>
-                                        <b>Status:</b> ${d.status||'N/A'}<br>
-                                        <b>Date:</b> ${ds}
-                                    </div>
-                                `);
-                            }
-                        }
-                    });
-
-                    if (inside.length) {
-                        div.innerHTML = `<b>${inside.length} Device(s) Inside:</b><hr style="margin:8px 0;">` + inside.join('');
-                    } else {
-                        div.innerHTML = `<b>No devices inside this polygon.</b>`;
-                    }
-                } catch (e) {
-                    console.error('Error loading devices for polyline:', e);
-                    div.innerHTML += `<div style="color:red;margin-top:8px;">Error loading devices.</div>`;
-                } finally {
-                    btn.remove();
-                }
-            };
-            div.appendChild(btn);
-            return div;
-        }
-
-        // ---------- DELETE OPPOSITE SHAPES ----------
-        async function deleteAllPolylines() {
-            try {
-                await remove(ref(db, 'polylines'));
-                polylineLayer.clearLayers();
-                if (previewPolyline) map.removeLayer(previewPolyline);
-                previewPolyline = null;
-                polylinePoints = [];
-                console.info('All polylines deleted (map + Firebase)');
-            } catch (e) {
-                console.error('Failed to delete polylines:', e);
-            }
-        }
-
-        async function deleteAllCircles() {
-            try {
-                await remove(ref(db, 'circles'));
-                circleLayer.clearLayers();
-                if (previewCircle) map.removeLayer(previewCircle);
-                previewCircle = null;
-                centerPoint = null;
-                console.info('All circles deleted (map + Firebase)');
-            } catch (e) {
-                console.error('Failed to delete circles:', e);
-            }
-        }
-
-        // ---------- MODAL ----------
-        function toggleModal() {
-            const o = document.getElementById('modalOverlay');
-            o.style.display = o.style.display === 'block' ? 'none' : 'block';
-        }
-        function toggleDoneButton(show) {
-            document.getElementById('doneButton').style.display = show ? 'block' : 'none';
-        }
-
-        // ---------- SEARCH ----------
-        async function searchLocation() {
-            const q = document.getElementById('search').value.trim();
-            if (!q) return;
-            try {
-                const res = await provider.search({ query: q });
-                if (res.length) {
-                    const { x, y, label } = res[0];
-                    map.setView([y, x], 13);
-                    searchMarker.setLatLng([y, x]).setPopupContent(label).openPopup();
-                } else {
-                    console.warn('Search: Location not found');
-                }
-            } catch (e) {
-                console.error('Search error:', e);
-            }
-        }
-
-        // ---------- LOAD DEVICES ----------
-        async function loadDevices() {
-            const btn = document.getElementById('loadDevices');
-            btn.disabled = true; btn.innerText = 'Loading...';
-            deviceMarkers.clearLayers();
-            try {
-                const snap = await get(ref(db, 'devices'));
-                const data = snap.val();
-                if (!data) {
-                    console.info('No devices found in Firebase.');
-                    btn.innerText = 'No devices';
-                    return;
-                }
-                Object.keys(data).forEach(id => {
-                    const d = data[id];
-                    const lat = parseFloat(d.latitude), lng = parseFloat(d.longitude);
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        const date = d.date ? new Date(d.date).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A';
-                        L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
-                            .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${date}<br><b>Status:</b> ${d.status||'N/A'}`);
-                    }
-                });
-                if (deviceMarkers.getLayers().length) map.fitBounds(deviceMarkers.getBounds(), { padding: [20, 20] });
-                btn.innerText = `Loaded ${deviceMarkers.getLayers().length}`;
-            } catch (e) {
-                console.error('Failed to load devices:', e);
-                btn.innerText = 'Load failed';
-            } finally {
-                btn.disabled = false;
-                setTimeout(() => btn.innerText = 'Load Devices from Firebase', 3000);
-                toggleModal();
-            }
-        }
-
-        // ---------- ADD SAMPLE ----------
-        async function addSampleDevice() {
-            const btn = document.getElementById('addSampleDevice');
-            btn.disabled = true; btn.innerText = 'Adding...';
-            try {
-                const id = 'device_' + Math.random().toString(36).substr(2, 6);
-                const lat = 14.7724 + (Math.random() * 0.02 - 0.01);
-                const lng = 120.9600 + (Math.random() * 0.02 - 0.01);
-                const date = new Date().toISOString();
-                const status = ['Active','Inactive','Offline'][Math.floor(Math.random()*3)];
-                await set(ref(db, 'devices/' + id), { latitude: lat, longitude: lng, date, status });
-                const m = L.marker([lat, lng], { icon: deviceIcon }).addTo(deviceMarkers)
-                    .bindPopup(`<b>ID:</b> ${id}<br><b>Lat:</b> ${lat.toFixed(5)}<br><b>Lng:</b> ${lng.toFixed(5)}<br><b>Date:</b> ${new Date(date).toLocaleString('en-US',{timeZone:'Asia/Manila'})}<br><b>Status:</b> ${status}`)
-                    .openPopup();
-                map.setView([lat,lng],13);
-                btn.innerText = 'Added!';
-            } catch (e) {
-                console.error('Failed to add sample device:', e);
-                btn.innerText = 'Add failed';
-            } finally {
-                btn.disabled = false;
-                setTimeout(() => btn.innerText = 'Add Sample Device', 3000);
-                toggleModal();
-            }
-        }
-
-        // ---------- CLEAR DEVICES ----------
-        async function clearDevices() {
-            if (!confirm('Delete ALL devices from Firebase?')) return;
-            const btn = document.getElementById('clearDevices');
-            btn.disabled = true; btn.innerText = 'Clearing...';
-            try {
-                await remove(ref(db, 'devices'));
-                deviceMarkers.clearLayers();
-                console.info('All devices cleared from Firebase and map.');
-            } catch (e) {
-                console.error('Failed to clear devices:', e);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = 'Clear Devices';
-                toggleModal();
-            }
-        }
-
-        // ---------- AUTO-SYNC TOGGLE ----------
-        const autoSyncBtn = document.getElementById('autoSyncBtn');
-        async function initAutoSync() {
-            try {
-                const snap = await get(ref(db, 'settings/autoSync'));
-                const saved = snap.val();
-                const isOn = saved === true;
-                if (saved === null) {
-                    await set(ref(db, 'settings/autoSync'), false);
-                    console.info('Auto-Sync setting initialized to OFF');
-                }
-                updateAutoSyncBtn(isOn);
-                if (isOn) autoSyncStart();
-            } catch (e) {
-                console.error('Failed to initialize Auto-Sync:', e);
-            }
-        }
-        function updateAutoSyncBtn(on) {
-            autoSyncBtn.textContent = `Auto-Sync: ${on?'ON':'OFF'}`;
-            autoSyncBtn.classList.toggle('on', on);
-            autoSyncBtn.classList.toggle('off', !on);
-        }
-        async function toggleAutoSync() {
-            const currentlyOn = autoSyncBtn.classList.contains('on');
-            const newVal = !currentlyOn;
-            try {
-                await set(ref(db, 'settings/autoSync'), newVal);
-                updateAutoSyncBtn(newVal);
-                if (newVal) {
-                    console.info('Auto-Sync enabled');
-                    autoSyncStart();
-                } else {
-                    console.info('Auto-Sync disabled');
-                }
-            } catch (e) {
-                console.error('Failed to toggle Auto-Sync:', e);
-            }
-        }
-        function autoSyncStart() {
-            loadDevices();
-            loadCircles();
-        }
-
-        // ---------- CIRCLE MODE ----------
-        async function toggleCircleMode() {
-            if (circleMode) {
-                toggleCircleModeOff();
-                return;
-            }
-
-            // Delete polylines if any
-            if (polylineLayer.getLayers().length > 0 || polylinePoints.length > 0) {
-                await deleteAllPolylines();
-            }
-
-            circleMode = true;
-            const btn = document.getElementById('createCircle');
-            btn.classList.add('active'); btn.innerText = 'Click center';
-            document.getElementById('coords').innerText = 'Click to set circle center';
-            toggleModal();
-        }
-
-        function toggleCircleModeOff() {
-            circleMode = false;
-            const btn = document.getElementById('createCircle');
-            btn.classList.remove('active'); btn.innerText = 'Create Circle';
-            document.getElementById('coords').innerText = 'Click on map to see coordinates';
-            centerPoint = null;
-            if (previewCircle) map.removeLayer(previewCircle); previewCircle = null;
-            map.off('mousemove');
-        }
-
-        // ---------- POLYLINE MODE ----------
-        async function togglePolylineMode() {
-            if (polylineMode) {
-                togglePolylineModeOff();
-                return;
-            }
-
-            // Delete circles if any
-            if (circleLayer.getLayers().length > 0 || centerPoint) {
-                await deleteAllCircles();
-            }
-
-            polylineMode = true;
-            const btn = document.getElementById('createPolyline');
-            btn.classList.add('active'); btn.innerText = 'Creating...';
-            document.getElementById('coords').innerText = 'Click to add point';
-            polylinePoints = [];
-            toggleDoneButton(true);
-            if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
-            toggleModal();
-        }
-
-        function togglePolylineModeOff() {
-            polylineMode = false;
-            const btn = document.getElementById('createPolyline');
-            btn.classList.remove('active'); btn.innerText = 'Create Polyline';
-            document.getElementById('coords').innerText = 'Click on map to see coordinates';
-            polylinePoints = [];
-            toggleDoneButton(false);
-            if (previewPolyline) map.removeLayer(previewPolyline); previewPolyline = null;
-        }
-
-        // ---------- FINISH POLYLINE ----------
-        async function finishPolyline() {
-            if (polylinePoints.length < 3) {
-                console.warn('Polyline needs at least 3 points');
-                return;
-            }
-            const id = 'polyline_' + Math.random().toString(36).substr(2, 6);
-            const date = new Date().toISOString();
-            try {
-                await set(ref(db, 'polylines'), {});
-                await set(ref(db, 'polylines/' + id), { points: polylinePoints.map(p=>({lat:p.lat,lng:p.lng})), date });
-                if (previewPolyline) map.removeLayer(previewPolyline);
-                polylineLayer.clearLayers();
-                const poly = L.polygon(polylinePoints, { color:'#FF5722', fillOpacity:0.05, weight:2 }).addTo(polylineLayer)
-                    .bindPopup(() => createPolylinePopup(id, polylinePoints, date))
-                    .openPopup();
-                map.fitBounds(poly.getBounds(), { padding:[20,20] });
-                togglePolylineModeOff();
-            } catch (e) {
-                console.error('Failed to save polyline:', e);
-            }
-            toggleModal();
-        }
-
-        // ---------- LOAD CIRCLES ----------
-        async function loadCircles() {
-            const btn = document.getElementById('loadCircles');
-            btn.disabled = true; btn.innerText = 'Loading...';
-            circleLayer.clearLayers();
-            try {
-                const snap = await get(ref(db, 'circles'));
-                const data = snap.val();
-                if (!data) {
-                    console.info('No circles found in Firebase.');
-                    btn.innerText = 'No circles';
-                    return;
-                }
-                Object.keys(data).forEach(id => {
-                    const c = data[id];
-                    const lat = parseFloat(c.latitude), lng = parseFloat(c.longitude), radius = parseFloat(c.radius);
-                    if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
-                        const date = c.date || new Date().toISOString();
-                        L.circle([lat,lng], { radius, color:'#FF5722', fillOpacity:0.05, weight:2 })
-                            .addTo(circleLayer)
-                            .bindPopup(() => createCirclePopup(id, lat, lng, radius, date));
-                    }
-                });
-                if (circleLayer.getLayers().length) map.fitBounds(circleLayer.getBounds(), { padding:[20,20] });
-                btn.innerText = `Loaded ${circleLayer.getLayers().length}`;
-            } catch (e) {
-                console.error('Failed to load circles:', e);
-                btn.innerText = 'Load failed';
-            } finally {
-                btn.disabled = false;
-                setTimeout(() => btn.innerText = 'Load Circles from Firebase', 3000);
-                toggleModal();
-            }
-        }
-
-        // ---------- MAP CLICK ----------
-        map.on('click', async e => {
-            const lat = e.latlng.lat.toFixed(5), lng = e.latlng.lng.toFixed(5);
-            if (circleMode) {
-                if (!centerPoint) {
-                    centerPoint = e.latlng;
-                    circleLayer.clearLayers();
-                    document.getElementById('coords').innerText = 'Move to set radius';
-                    if (clickMarker) map.removeLayer(clickMarker);
-                    map.on('mousemove', m => {
-                        if (!centerPoint) return;
-                        const r = centerPoint.distanceTo(m.latlng);
-                        if (previewCircle) map.removeLayer(previewCircle);
-                        previewCircle = L.circle(centerPoint, { radius:r, color:'#FF5722', fillOpacity:0.05, weight:2, dashArray:'5,10' }).addTo(map);
-                        document.getElementById('coords').innerText = `Radius: ${(r/1000).toFixed(2)} km`;
-                    });
-                } else {
-                    const radius = centerPoint.distanceTo(e.latlng);
-                    const date = new Date().toISOString();
-                    const id = 'circle_' + Math.random().toString(36).substr(2, 6);
-                    if (previewCircle) map.removeLayer(previewCircle);
-                    map.off('mousemove');
-                    try {
-                        await set(ref(db, 'circles'), {});
-                        await set(ref(db, 'circles/' + id), { latitude:centerPoint.lat, longitude:centerPoint.lng, radius, date });
-                        circleLayer.clearLayers();
-                        L.circle(centerPoint, { radius, color:'#FF5722', fillOpacity:0.05, weight:2 })
-                            .addTo(circleLayer)
-                            .bindPopup(() => createCirclePopup(id, centerPoint.lat, centerPoint.lng, radius, date))
-                            .openPopup();
-                        map.setView(centerPoint,13);
-                    } catch (e) {
-                        console.error('Failed to save circle:', e);
-                    }
-                    toggleCircleModeOff();
-                }
-            } else if (polylineMode) {
-                polylinePoints.push(e.latlng);
-                document.getElementById('coords').innerText = `Point ${polylinePoints.length}: ${lat}, ${lng}`;
-                if (previewPolyline) map.removeLayer(previewPolyline);
-                previewPolyline = L.polyline(polylinePoints, { color:'#FF5722', weight:2 }).addTo(map);
-                if (clickMarker) map.removeLayer(clickMarker);
-            } else {
-                document.getElementById('coords').innerText = `Lat: ${lat}, Lng: ${lng}`;
-                if (clickMarker) map.removeLayer(clickMarker);
-                clickMarker = L.marker(e.latlng, { icon:clickIcon }).addTo(map)
-                    .bindPopup(`Clicked<br>Lat: ${lat}, Lng: ${lng}`).openPopup();
-            }
+        
+        // Theme switching
+        themeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const theme = button.getAttribute('data-theme');
+                document.body.className = '';
+                document.body.classList.add(`theme-${theme}`);
+            });
         });
-
-        // ---------- EVENT LISTENERS ----------
-        document.getElementById('search').addEventListener('keypress', e => e.key==='Enter' && searchLocation());
-        document.getElementById('searchButton').addEventListener('click', searchLocation);
-        document.getElementById('loadDevices').addEventListener('click', loadDevices);
-        document.getElementById('addSampleDevice').addEventListener('click', addSampleDevice);
-        document.getElementById('createCircle').addEventListener('click', toggleCircleMode);
-        document.getElementById('createPolyline').addEventListener('click', togglePolylineMode);
-        document.getElementById('loadCircles').addEventListener('click', loadCircles);
-        document.getElementById('doneButton').addEventListener('click', finishPolyline);
-        document.getElementById('gearIcon').addEventListener('click', toggleModal);
-        document.getElementById('closeModal').addEventListener('click', toggleModal);
-        document.getElementById('modalOverlay').addEventListener('click', e => e.target===e.currentTarget && toggleModal());
-
-        // NEW BUTTONS
-        document.getElementById('clearDevices').addEventListener('click', clearDevices);
-        document.getElementById('autoSyncBtn').addEventListener('click', toggleAutoSync);
-
-        // ---------- INITIALISE AUTO-SYNC ----------
-        initAutoSync();
+        
+        // Initialize clock
+        updateClock();
+        
+        // Update clock every 50ms for smooth second hand movement
+        setInterval(updateClock, 50);
     </script>
 </body>
 </html>
