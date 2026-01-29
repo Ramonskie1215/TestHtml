@@ -10,6 +10,7 @@
         .path-label { color: #8b949e; }
         pre { background: #0d1117; padding: 10px; border-radius: 6px; overflow: auto; line-height: 1.4; color: #c9d1d9; }
         .error { color: #ff7b72; }
+        .loading { color: #d29922; }
     </style>
 </head>
 <body>
@@ -18,13 +19,14 @@
     <span class="path-label">Database Path:</span> <span id="current-url">/</span>
 </div>
 
-<pre id="output">Establishing secure connection...</pre>
+<pre id="output" class="loading">Establishing secure connection...</pre>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+    // Your Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBxTDFA39JxFGMzqa0qrVwM8bQNEuqyQ78",
         authDomain: "pisowifi-c2429.firebaseapp.com",
@@ -35,35 +37,46 @@
         appId: "1:136802332067:web:685f0683800e719db4be16"
     };
 
-    // 1. Determine the path
-    let rawPath = window.location.pathname.substring(1); // Remove leading slash
-    
-    // Clean ".json" if present, or set to empty string for root access
+    // 1. Path Processing
+    // Get the path, remove leading slash, and strip ".json"
+    let rawPath = window.location.pathname.substring(1); 
     let firebaseNode = rawPath.replace(".json", ""); 
     
-    // Update UI
+    // Update the UI header
     document.getElementById('current-url').innerText = firebaseNode === "" ? "(root) /" : "/" + firebaseNode;
 
-    // 2. Firebase Connection
+    // 2. Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
 
+    // 3. Authenticate and Request Data
     signInAnonymously(auth)
         .then(() => {
-            // If firebaseNode is empty, it targets the root of the DB
-            const dataRef = ref(db, firebaseNode);
+            document.getElementById('output').innerText = `Fetching data for node: [${firebaseNode || "root"}]...`;
+            
+            // FIX: If path is empty, call ref(db) without a second argument to get root.
+            const dataRef = (firebaseNode === "" || firebaseNode === "/") 
+                            ? ref(db) 
+                            : ref(db, firebaseNode);
+            
             return get(dataRef);
         })
         .then((snapshot) => {
+            const output = document.getElementById('output');
+            output.classList.remove('loading');
+            
             if (snapshot.exists()) {
-                document.getElementById('output').innerText = JSON.stringify(snapshot.val(), null, 4);
+                output.innerText = JSON.stringify(snapshot.val(), null, 4);
             } else {
-                document.getElementById('output').innerHTML = `<span class="error">// 404: No data found at this path.</span>`;
+                output.innerHTML = `<span class="error">// 404: No data found at this path.</span>`;
             }
         })
         .catch((err) => {
-            document.getElementById('output').innerHTML = `<span class="error">// Error: ${err.message}</span>`;
+            const output = document.getElementById('output');
+            output.classList.remove('loading');
+            output.innerHTML = `<span class="error">// Error: ${err.message}</span>`;
+            console.error(err);
         });
 </script>
 
