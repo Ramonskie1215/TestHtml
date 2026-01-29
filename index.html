@@ -3,271 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full Screen Clock</title>
+    <title>PisoWiFi Boot Monitor</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-            overflow: hidden;
-            transition: background 0.5s ease;
-        }
-
-        .clock-container {
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        .analog-clock {
-            width: 40vmin;
-            height: 40vmin;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2vmin solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            box-shadow: 
-                inset 0 0 5vmin rgba(0, 0, 0, 0.2),
-                0 2vmin 5vmin rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-        }
-
-        .clock-center {
-            position: absolute;
-            width: 3vmin;
-            height: 3vmin;
-            background: #fff;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-            box-shadow: 0 0 1vmin rgba(0, 0, 0, 0.5);
-        }
-
-        .hand {
-            position: absolute;
-            bottom: 50%;
-            left: 50%;
-            transform-origin: bottom;
-            border-radius: 1vmin 1vmin 0 0;
-            transform: translateX(-50%);
-        }
-
-        .hour-hand {
-            width: 1.5vmin;
-            height: 30%;
-            background: #fff;
-            z-index: 3;
-        }
-
-        .minute-hand {
-            width: 1vmin;
-            height: 40%;
-            background: #fff;
-            z-index: 2;
-        }
-
-        .second-hand {
-            width: 0.5vmin;
-            height: 45%;
-            background: #ff5252;
-            z-index: 1;
-        }
-
-        .marker {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-        }
-
-        .marker::after {
-            content: '';
-            position: absolute;
-            top: 1vmin;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0.5vmin;
-            height: 2vmin;
-            background: rgba(255, 255, 255, 0.8);
-        }
-
-        .marker-1 { transform: rotate(30deg); }
-        .marker-2 { transform: rotate(60deg); }
-        .marker-3 { transform: rotate(90deg); }
-        .marker-4 { transform: rotate(120deg); }
-        .marker-5 { transform: rotate(150deg); }
-        .marker-6 { transform: rotate(180deg); }
-        .marker-7 { transform: rotate(210deg); }
-        .marker-8 { transform: rotate(240deg); }
-        .marker-9 { transform: rotate(270deg); }
-        .marker-10 { transform: rotate(300deg); }
-        .marker-11 { transform: rotate(330deg); }
-        .marker-12 { transform: rotate(0deg); }
-
-        .digital-clock {
-            font-size: 10vmin;
-            font-weight: 300;
-            margin-top: 5vmin;
-            text-shadow: 0.5vmin 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
-            letter-spacing: 0.5vmin;
-        }
-
-        .date-display {
-            font-size: 3vmin;
-            margin-top: 2vmin;
-            opacity: 0.9;
-            text-shadow: 0.2vmin 0.2vmin 0.5vmin rgba(0, 0, 0, 0.5);
-        }
-
-        .theme-selector {
-            position: absolute;
-            bottom: 5vmin;
-            display: flex;
-            gap: 2vmin;
-        }
-
-        .theme-btn {
-            width: 4vmin;
-            height: 4vmin;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 0.3vmin solid rgba(255, 255, 255, 0.5);
-            transition: transform 0.3s ease;
-        }
-
-        .theme-btn:hover {
-            transform: scale(1.2);
-        }
-
-        .theme-classic { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); }
-        .theme-dark { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); }
-        .theme-light { background: linear-gradient(135deg, #8e9eab, #eef2f3); }
-        .theme-ocean { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
-        .theme-sunset { background: linear-gradient(135deg, #ff5e62, #ff9966); }
-        .theme-forest { background: linear-gradient(135deg, #134E5E, #71B280); }
-        .theme-night { background: linear-gradient(135deg, #0B486B, #F56217); }
-
-        @media (max-width: 768px) {
-            .analog-clock {
-                width: 60vmin;
-                height: 60vmin;
-            }
-            
-            .digital-clock {
-                font-size: 12vmin;
-            }
-            
-            .date-display {
-                font-size: 4vmin;
-            }
-        }
+        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 0.8em; font-weight: bold; margin-bottom: 15px; }
+        .online { background: #e6fffa; color: #234e52; border: 1px solid #81e6d9; }
+        .offline { background: #fff5f5; color: #822727; border: 1px solid #feb2b2; }
+        pre { background: #2d3748; color: #a0aec0; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 14px; }
+        h2 { margin-top: 0; color: #2d3748; }
     </style>
 </head>
 <body>
-    <div class="clock-container">
-        <div class="analog-clock">
-            <!-- Clock markers -->
-            <div class="marker marker-1"></div>
-            <div class="marker marker-2"></div>
-            <div class="marker marker-3"></div>
-            <div class="marker marker-4"></div>
-            <div class="marker marker-5"></div>
-            <div class="marker marker-6"></div>
-            <div class="marker marker-7"></div>
-            <div class="marker marker-8"></div>
-            <div class="marker marker-9"></div>
-            <div class="marker marker-10"></div>
-            <div class="marker marker-11"></div>
-            <div class="marker marker-12"></div>
-            
-            <!-- Clock hands -->
-            <div class="hand hour-hand" id="hour-hand"></div>
-            <div class="hand minute-hand" id="minute-hand"></div>
-            <div class="hand second-hand" id="second-hand"></div>
-            
-            <!-- Clock center -->
-            <div class="clock-center"></div>
-        </div>
-        
-        <div class="digital-clock" id="digital-clock">00:00:00</div>
-        <div class="date-display" id="date-display">Monday, January 1, 2023</div>
-        
-        <div class="theme-selector">
-            <div class="theme-btn theme-classic" data-theme="classic"></div>
-            <div class="theme-btn theme-dark" data-theme="dark"></div>
-            <div class="theme-btn theme-light" data-theme="light"></div>
-            <div class="theme-btn theme-ocean" data-theme="ocean"></div>
-            <div class="theme-btn theme-sunset" data-theme="sunset"></div>
-            <div class="theme-btn theme-forest" data-theme="forest"></div>
-            <div class="theme-btn theme-night" data-theme="night"></div>
-        </div>
-    </div>
 
-    <script>
-        // Get DOM elements
-        const hourHand = document.getElementById('hour-hand');
-        const minuteHand = document.getElementById('minute-hand');
-        const secondHand = document.getElementById('second-hand');
-        const digitalClock = document.getElementById('digital-clock');
-        const dateDisplay = document.getElementById('date-display');
-        const themeButtons = document.querySelectorAll('.theme-btn');
-        
-        // Update clock function
-        function updateClock() {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const seconds = now.getSeconds();
-            const milliseconds = now.getMilliseconds();
+<div class="container">
+    <h2>Device Boot Status</h2>
+    <div id="auth-status" class="status-badge offline">Connecting...</div>
+    
+    <p><strong>Current Data at /boot:</strong></p>
+    <pre id="data-display">Awaiting data...</pre>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Your specific configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyBxTDFA39JxFGMzqa0qrVwM8bQNEuqyQ78",
+        authDomain: "pisowifi-c2429.firebaseapp.com",
+        databaseURL: "https://pisowifi-c2429-default-rtdb.firebaseio.com",
+        projectId: "pisowifi-c2429",
+        storageBucket: "pisowifi-c2429.firebasestorage.app",
+        messagingSenderId: "136802332067",
+        appId: "1:136802332067:web:685f0683800e719db4be16"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    const authDisplay = document.getElementById('auth-status');
+    const dataDisplay = document.getElementById('data-display');
+
+    // 1. Sign in Anonymously
+    signInAnonymously(auth)
+        .then(() => {
+            authDisplay.innerText = "● Authenticated Anonymously";
+            authDisplay.className = "status-badge online";
             
-            // Calculate angles for clock hands
-            const secondAngle = (seconds + milliseconds / 1000) * 6; // 360/60 = 6 degrees per second
-            const minuteAngle = (minutes + seconds / 60) * 6; // 360/60 = 6 degrees per minute
-            const hourAngle = (hours % 12 + minutes / 60) * 30; // 360/12 = 30 degrees per hour
-            
-            // Apply rotations to clock hands
-            secondHand.style.transform = `translateX(-50%) rotate(${secondAngle}deg)`;
-            minuteHand.style.transform = `translateX(-50%) rotate(${minuteAngle}deg)`;
-            hourHand.style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
-            
-            // Update digital clock
-            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            digitalClock.textContent = timeString;
-            
-            // Update date display
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            dateDisplay.textContent = now.toLocaleDateString('en-US', options);
-        }
-        
-        // Theme switching
-        themeButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const theme = button.getAttribute('data-theme');
-                document.body.className = '';
-                document.body.classList.add(`theme-${theme}`);
+            // 2. Start Listening to /boot
+            const bootRef = ref(db, 'boot');
+            onValue(bootRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data !== null) {
+                    dataDisplay.innerText = JSON.stringify(data, null, 4);
+                    console.log("Updated Data:", data);
+                } else {
+                    dataDisplay.innerText = "No data exists at this path.";
+                }
+            }, (error) => {
+                dataDisplay.innerText = "Error: " + error.message;
+                console.error(error);
             });
+        })
+        .catch((error) => {
+            authDisplay.innerText = "● Auth Failed";
+            authDisplay.className = "status-badge offline";
+            dataDisplay.innerText = "Authentication error: " + error.message + 
+                                   "\n\nNote: Make sure 'Anonymous' is enabled in Firebase Console.";
         });
-        
-        // Initialize clock
-        updateClock();
-        
-        // Update clock every 50ms for smooth second hand movement
-        setInterval(updateClock, 50);
-    </script>
+</script>
+
 </body>
 </html>
