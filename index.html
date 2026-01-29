@@ -2,29 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase JSON Explorer</title>
+    <title>JSON GET</title>
     <style>
-        body { font-family: 'Courier New', monospace; background: #0d1117; color: #58a6ff; padding: 20px; margin: 0; }
-        .header { background: #161b22; padding: 15px; border-bottom: 1px solid #30363d; margin: -20px -20px 20px -20px; }
-        .path-label { color: #8b949e; font-size: 0.9em; }
-        #current-path { color: #d29922; font-weight: bold; }
-        pre { background: #0d1117; padding: 10px; border-radius: 6px; overflow: auto; line-height: 1.4; color: #c9d1d9; }
-        .error { color: #ff7b72; }
-        .hint { color: #8b949e; font-size: 0.8em; margin-top: 10px; border-top: 1px solid #30363d; padding-top: 10px; }
+        /* Minimalist "Plain Text" Style */
+        body { margin: 20px; background: white; color: black; }
+        pre { 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            font-family: monospace; 
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <span class="path-label">Target Node:</span> <span id="current-path">/</span>
-</div>
-
-<pre id="output">Initializing connection...</pre>
-
-<div class="hint">
-    Try: <a href="#/boot" style="color: #58a6ff;">#/boot</a> | <a href="#" style="color: #58a6ff;">#/(root)</a>
-</div>
+<pre id="output">Loading...</pre>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -41,43 +33,38 @@
         appId: "1:136802332067:web:685f0683800e719db4be16"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    async function fetchData() {
+    async function getJsonData() {
         const output = document.getElementById('output');
-        const pathDisplay = document.getElementById('current-path');
         
-        // 1. Get path from Hash (e.g., "#/boot.json" -> "boot")
+        // Extract path from hash (e.g., #/boot -> boot)
         let hash = window.location.hash || "#/";
-        let firebaseNode = hash.replace("#/", "").replace(".json", "");
-        
-        pathDisplay.innerText = firebaseNode === "" ? "/" : "/" + firebaseNode;
-        output.innerText = `Requesting ${firebaseNode || "root"}...`;
+        let path = hash.replace("#/", "").replace(".json", "");
 
         try {
-            // 2. Auth & Get Data
             await signInAnonymously(auth);
-            const dataRef = firebaseNode === "" ? ref(db) : ref(db, firebaseNode);
+            
+            // Handle root vs specific node
+            const dataRef = (path === "" || path === "/") ? ref(db) : ref(db, path);
             const snapshot = await get(dataRef);
 
             if (snapshot.exists()) {
-                output.innerText = JSON.stringify(snapshot.val(), null, 4);
+                // Output raw stringified JSON
+                output.textContent = JSON.stringify(snapshot.val(), null, 4);
             } else {
-                output.innerHTML = `<span class="error">// 404: Node "${firebaseNode}" not found.</span>`;
+                output.textContent = "null";
             }
-        } catch (err) {
-            output.innerHTML = `<span class="error">// Error: ${err.message}</span>`;
+        } catch (e) {
+            output.textContent = "Error: " + e.message;
         }
     }
 
-    // Run on load
-    fetchData();
-
-    // Re-run if the user changes the URL hash without refreshing
-    window.addEventListener('hashchange', fetchData);
+    // Listen for hash changes to allow navigation without refresh
+    window.addEventListener('hashchange', getJsonData);
+    getJsonData();
 </script>
 
 </body>
